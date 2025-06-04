@@ -22,10 +22,19 @@ header {
   background-color: #1a237e;
   color: white;
   border-radius: 5px;
+  position: relative;
 }
 
 header h1 {
   margin-bottom: 10px;
+}
+
+header span[style*="user"] {
+  position: absolute;
+  top: 20px;
+  right: 30px;
+  cursor: pointer;
+  font-size: 24px;
 }
 
 main {
@@ -197,4 +206,29 @@ footer {
   margin-top: 30px;
   padding: 20px;
   color: #666;
+}
+
+/* Admin/teacher login box styles */
+#login-form-box, #logout-form-box {
+  min-width: 220px;
+}
+#login-form-box input {
+  margin-bottom: 8px;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+#login-form-box button, #logout-form-box button {
+  width: 100%;
+  padding: 8px;
+  background: #1a237e;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 6px;
+}
+#login-form-box button:hover, #logout-form-box button:hover {
+  background: #3949ab;
 }

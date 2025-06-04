@@ -3,25 +3,93 @@ document.addEventListener("DOMContentLoaded", () => {
   const activitySelect = document.getElementById("activity");
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
+  const header = document.querySelector("header");
+  let isTeacher = false;
+  let teacherName = null;
+
+  // Add login/logout UI
+  const userIcon = document.createElement("span");
+  userIcon.textContent = "👤";
+  userIcon.style.cssText =
+    "position:absolute;top:20px;right:30px;cursor:pointer;font-size:24px;";
+  header.appendChild(userIcon);
+
+  const loginBox = document.createElement("div");
+  loginBox.style.cssText =
+    "display:none;position:fixed;top:80px;right:30px;background:#fff;padding:20px;border:1px solid #ccc;border-radius:6px;z-index:1000;box-shadow:0 2px 8px #0002;";
+  loginBox.innerHTML = `
+    <div id="login-form-box">
+      <h4>Teacher Login</h4>
+      <input id="login-username" placeholder="Username" style="margin-bottom:8px;width:100%"><br>
+      <input id="login-password" type="password" placeholder="Password" style="margin-bottom:8px;width:100%"><br>
+      <button id="login-btn">Login</button>
+    </div>
+    <div id="logout-form-box" style="display:none;">
+      <p>Logged in as <span id="teacher-name"></span></p>
+      <button id="logout-btn">Logout</button>
+    </div>
+  `;
+  document.body.appendChild(loginBox);
+
+  userIcon.onclick = () => {
+    loginBox.style.display =
+      loginBox.style.display === "none" ? "block" : "none";
+  };
+
+  async function checkWhoAmI() {
+    const res = await fetch("/whoami");
+    const data = await res.json();
+    isTeacher = data.role === "teacher";
+    teacherName = data.username || null;
+    updateLoginUI();
+  }
+
+  function updateLoginUI() {
+    if (isTeacher) {
+      loginBox.querySelector("#login-form-box").style.display = "none";
+      loginBox.querySelector("#logout-form-box").style.display = "block";
+      loginBox.querySelector("#teacher-name").textContent = teacherName;
+    } else {
+      loginBox.querySelector("#login-form-box").style.display = "block";
+      loginBox.querySelector("#logout-form-box").style.display = "none";
+    }
+  }
+
+  loginBox.querySelector("#login-btn").onclick = async () => {
+    const username = loginBox.querySelector("#login-username").value;
+    const password = loginBox.querySelector("#login-password").value;
+    const res = await fetch(
+      `/login?username=${encodeURIComponent(username)}&password=${encodeURIComponent(
+        password
+      )}`,
+      { method: "POST" }
+    );
+    if (res.ok) {
+      await checkWhoAmI();
+      loginBox.style.display = "none";
+      fetchActivities();
+    } else {
+      alert("Login failed");
+    }
+  };
+  loginBox.querySelector("#logout-btn").onclick = async () => {
+    await fetch("/logout", { method: "POST" });
+    await checkWhoAmI();
+    loginBox.style.display = "none";
+    fetchActivities();
+  };
 
   // Function to fetch activities from API
   async function fetchActivities() {
     try {
       const response = await fetch("/activities");
       const activities = await response.json();
-
-      // Clear loading message
       activitiesList.innerHTML = "";
-
-      // Populate activities list
+      activitySelect.innerHTML = '<option value="">-- Select an activity --</option>';
       Object.entries(activities).forEach(([name, details]) => {
         const activityCard = document.createElement("div");
         activityCard.className = "activity-card";
-
-        const spotsLeft =
-          details.max_participants - details.participants.length;
-
-        // Create participants HTML with delete icons instead of bullet points
+        const spotsLeft = details.max_participants - details.participants.length;
         const participantsHTML =
           details.participants.length > 0
             ? `<div class="participants-section">
@@ -30,13 +98,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 ${details.participants
                   .map(
                     (email) =>
-                      `<li><span class="participant-email">${email}</span><button class="delete-btn" data-activity="${name}" data-email="${email}">❌</button></li>`
+                      `<li><span class="participant-email">${email}</span>${isTeacher ? `<button class="delete-btn" data-activity="${name}" data-email="${email}">❌</button>` : ""}</li>`
                   )
                   .join("")}
               </ul>
             </div>`
             : `<p><em>No participants yet</em></p>`;
-
         activityCard.innerHTML = `
           <h4>${name}</h4>
           <p>${details.description}</p>
@@ -46,20 +113,17 @@ document.addEventListener("DOMContentLoaded", () => {
             ${participantsHTML}
           </div>
         `;
-
         activitiesList.appendChild(activityCard);
-
-        // Add option to select dropdown
         const option = document.createElement("option");
         option.value = name;
         option.textContent = name;
         activitySelect.appendChild(option);
       });
-
-      // Add event listeners to delete buttons
-      document.querySelectorAll(".delete-btn").forEach((button) => {
-        button.addEventListener("click", handleUnregister);
-      });
+      if (isTeacher) {
+        document.querySelectorAll(".delete-btn").forEach((button) => {
+          button.addEventListener("click", handleUnregister);
+        });
+      }
     } catch (error) {
       activitiesList.innerHTML =
         "<p>Failed to load activities. Please try again later.</p>";
@@ -69,6 +133,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Handle unregister functionality
   async function handleUnregister(event) {
+    if (!isTeacher) return;
     const button = event.target;
     const activity = button.getAttribute("data-activity");
     const email = button.getAttribute("data-email");
@@ -113,6 +178,13 @@ document.addEventListener("DOMContentLoaded", () => {
   // Handle form submission
   signupForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!isTeacher) {
+      messageDiv.textContent = "Only teachers can register students.";
+      messageDiv.className = "error";
+      messageDiv.classList.remove("hidden");
+      setTimeout(() => messageDiv.classList.add("hidden"), 5000);
+      return;
+    }
 
     const email = document.getElementById("email").value;
     const activity = document.getElementById("activity").value;
@@ -156,5 +228,5 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Initialize app
-  fetchActivities();
+  checkWhoAmI().then(fetchActivities);
 });
